@@ -3,10 +3,10 @@ import { useRef, useState } from 'react';
 export default function Home() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const imageRef = useRef<HTMLImageElement>(null);
-  const logoRef = useRef<HTMLImageElement>(null);
 
   const [imageURL, setImageURL] = useState<string | null>(null);
-  const [logoURL, setLogoURL] = useState<string | null>(null);
+  const [text, setText] = useState<string>('ziyech');
+  const [opacity, setOpacity] = useState<number>(0.6); // Opaklık ayarı burada
   const [downloadURL, setDownloadURL] = useState<string | null>(null);
 
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -22,90 +22,94 @@ export default function Home() {
     }
   };
 
-  const handleLogoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      const reader = new FileReader();
-      reader.onload = (event) => {
-        if (event.target?.result) {
-          setLogoURL(event.target.result as string);
-        }
-      };
-      reader.readAsDataURL(file);
-    }
-  };
-
   const drawWatermark = () => {
     const canvas = canvasRef.current;
     const ctx = canvas?.getContext('2d');
     const image = imageRef.current;
-    const logo = logoRef.current;
 
-    if (canvas && ctx && image && logo) {
+    if (canvas && ctx && image) {
       canvas.width = image.width;
       canvas.height = image.height;
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
 
       ctx.drawImage(image, 0, 0);
 
-      const logoSize = image.width / 4;
-      const x = image.width - logoSize - 20;
-      const y = image.height - logoSize - 20;
+      const fontSize = Math.floor(canvas.width / 6);
+      const textX = canvas.width / 2;
+      const textY = canvas.height / 2;
 
-      // --- GÖLGE EFEKTİ ---
-      ctx.shadowColor = 'rgba(10, 20, 90, 0.3)'; // soft lacivert
-      ctx.shadowBlur = 15;
-      ctx.drawImage(logo, x, y, logoSize, logoSize);
+      const textCanvas = document.createElement('canvas');
+      textCanvas.width = canvas.width;
+      textCanvas.height = canvas.height;
+      const textCtx = textCanvas.getContext('2d');
 
-      // --- HAYALET LOGO (sol alt, yarı opak) ---
-      ctx.shadowBlur = 0;
-      ctx.globalAlpha = 0.2;
-      ctx.drawImage(logo, 20, image.height - logoSize / 2 - 20, logoSize / 2, logoSize / 2);
-      ctx.globalAlpha = 1.0;
+      if (textCtx) {
+        const gradientImage = new Image();
+        gradientImage.src = '/Rectangle 108.png';
 
-      // --- GÜRÜLTÜ (NOISE) EFEKTİ ---
-      const noiseCanvas = document.createElement('canvas');
-      noiseCanvas.width = canvas.width;
-      noiseCanvas.height = canvas.height;
-      const noiseCtx = noiseCanvas.getContext('2d');
+        gradientImage.onload = () => {
+          textCtx.save();
+          textCtx.translate(textX, textY);
+          textCtx.rotate((-45 * Math.PI) / 180);
+          textCtx.translate(-textX, -textY);
 
-      if (noiseCtx) {
-        const noiseImageData = noiseCtx.createImageData(canvas.width, canvas.height);
-        for (let i = 0; i < noiseImageData.data.length; i += 4) {
-          const val = Math.floor(Math.random() * 30); // düşük değerli gürültü
-          noiseImageData.data[i] = val;
-          noiseImageData.data[i + 1] = val;
-          noiseImageData.data[i + 2] = val;
-          noiseImageData.data[i + 3] = 20; // transparanlık
-        }
-        noiseCtx.putImageData(noiseImageData, 0, 0);
-        ctx.drawImage(noiseCanvas, 0, 0);
+          textCtx.drawImage(gradientImage, 0, 0, canvas.width, canvas.height);
+          textCtx.globalCompositeOperation = 'destination-in';
+          textCtx.globalAlpha = opacity; // Opaklık burada uygulanıyor
+          textCtx.font = `bold ${fontSize}px Arial`;
+          textCtx.textAlign = 'center';
+          textCtx.textBaseline = 'middle';
+          textCtx.fillText(text, textX, textY);
+
+          textCtx.restore();
+
+          ctx.drawImage(textCanvas, 0, 0);
+          const dataURL = canvas.toDataURL('image/png');
+          setDownloadURL(dataURL);
+        };
       }
-
-      const dataURL = canvas.toDataURL('image/png');
-      setDownloadURL(dataURL);
     }
   };
 
   return (
-    <div style={{ padding: '2rem', fontFamily: 'sans-serif' }}>
+    <div style={{ padding: '2rem', fontFamily: 'sans-serif', background: '#111', color: '#eee' }}>
       <h1>Unremovable Watermark Generator</h1>
 
       <label>1. Upload your image:</label><br />
       <input type="file" accept="image/*" onChange={handleImageUpload} />
       <br /><br />
 
-      <label>2. Upload your logo:</label><br />
-      <input type="file" accept="image/*" onChange={handleLogoUpload} />
+      <label>2. Enter watermark text:</label><br />
+      <input
+        type="text"
+        value={text}
+        onChange={(e) => setText(e.target.value)}
+        style={{ padding: '0.5rem', fontSize: '1rem', width: '200px' }}
+      />
       <br /><br />
 
-      {imageURL && logoURL && (
+      <label>3. Set watermark opacity:</label><br />
+      <input
+        type="range"
+        min={0}
+        max={1}
+        step={0.01}
+        value={opacity}
+        onChange={(e) => setOpacity(parseFloat(e.target.value))}
+        style={{ width: '200px' }}
+      />
+      <span> {opacity}</span>
+      <br /><br />
+
+      {imageURL && (
         <>
           <img ref={imageRef} src={imageURL} alt="uploaded" onLoad={drawWatermark} style={{ display: 'none' }} />
-          <img ref={logoRef} src={logoURL} alt="logo" onLoad={drawWatermark} style={{ display: 'none' }} />
-          <canvas ref={canvasRef} style={{ border: '1px solid #000', marginTop: '1rem', maxWidth: '100%' }} />
+          <canvas ref={canvasRef} style={{ border: '1px solid #333', marginTop: '1rem', maxWidth: '100%' }} />
           <br />
           {downloadURL && (
-            <a href={downloadURL} download="watermarked.png">Download Watermarked Image</a>
+            <a href={downloadURL} download="watermarked.png" style={{ color: '#ccc' }}>
+              Download Watermarked Image
+            </a>
           )}
         </>
       )}
