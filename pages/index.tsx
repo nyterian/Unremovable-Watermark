@@ -1,5 +1,5 @@
 import { useRef, useState, useEffect } from 'react';
-import { auth, loginWithGoogle, logout, onAuthStateChanged } from 'C:/Users/yagzc/Desktop/project/watermark-no-tailwind/firebase_auth.ts';
+import { auth, loginWithGoogle, logout, onAuthStateChanged } from '../firebase_auth';
 
 export default function Home() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
