@@ -1,5 +1,4 @@
 import { useRef, useState, useEffect } from 'react';
-import { auth, loginWithGoogle, logout, onAuthStateChanged } from '../firebase_auth';
 
 export default function Home() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -8,15 +7,15 @@ export default function Home() {
   const [imageURL, setImageURL] = useState<string | null>(null);
   const [text, setText] = useState<string>('ziyech');
   const [downloadURL, setDownloadURL] = useState<string | null>(null);
-  const [user, setUser] = useState<any>(null);
-
-  const opacity = 0.6; // <= watermark opaklığı (0.0 tamamen görünmez, 1.0 tam opak)
+  const [canUse, setCanUse] = useState<boolean>(false);
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, (user) => {
-      setUser(user);
-    });
-    return () => unsubscribe();
+    const used = localStorage.getItem('freeUse');
+    if (!used) {
+      setCanUse(true); // İlk defa kullanabilir
+    } else {
+      setCanUse(false); // Kullanmış, giriş yapması gerek
+    }
   }, []);
 
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -62,21 +61,21 @@ export default function Home() {
           textCtx.textAlign = 'center';
           textCtx.textBaseline = 'middle';
 
-          textCtx.save();
-          textCtx.translate(textX, textY);
-          textCtx.rotate((45 * Math.PI) / 180);
-
-          textCtx.drawImage(gradientImage, -canvas.width / 2, -canvas.height / 2, canvas.width, canvas.height);
-
+          textCtx.drawImage(gradientImage, 0, 0, canvas.width, canvas.height);
           textCtx.globalCompositeOperation = 'destination-in';
-          textCtx.fillStyle = `rgba(255, 255, 255, ${opacity})`;
-          textCtx.fillText(text, 0, 0);
+          textCtx.fillStyle = 'white';
 
-          textCtx.restore();
+          textCtx.translate(textX, textY);
+          textCtx.rotate((-45 * Math.PI) / 180);
+          textCtx.fillText(text, 0, 0);
+          textCtx.setTransform(1, 0, 0, 1, 0, 0);
 
           ctx.drawImage(textCanvas, 0, 0);
           const dataURL = canvas.toDataURL('image/png');
           setDownloadURL(dataURL);
+
+          localStorage.setItem('freeUse', 'used');
+          setCanUse(false);
         };
       }
     }
@@ -86,18 +85,7 @@ export default function Home() {
     <div style={{ padding: '2rem', fontFamily: 'sans-serif', background: '#111', color: '#eee' }}>
       <h1>Unremovable Watermark Generator</h1>
 
-      {!user ? (
-        <button onClick={loginWithGoogle}>Google ile Giriş Yap</button>
-      ) : (
-        <div>
-          <p>Merhaba, {user.displayName}</p>
-          <button onClick={logout}>Çıkış Yap</button>
-        </div>
-      )}
-
-      <br /><br />
-
-      {user && (
+      {canUse ? (
         <>
           <label>1. Upload your image:</label><br />
           <input type="file" accept="image/*" onChange={handleImageUpload} />
@@ -124,6 +112,12 @@ export default function Home() {
               )}
             </>
           )}
+        </>
+      ) : (
+        <>
+          <p style={{ marginTop: '2rem', fontSize: '1.1rem' }}>
+            Giriş yapmadan yalnızca 1 kez kullanabilirsin. Devam etmek için giriş yap.
+          </p>
         </>
       )}
     </div>
