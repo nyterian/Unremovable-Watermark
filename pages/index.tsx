@@ -1,19 +1,5 @@
 import { useRef, useState, useEffect } from 'react';
-import { initializeApp } from 'firebase/app';
-import { getAuth, GoogleAuthProvider, signInWithPopup, onAuthStateChanged, signOut } from 'firebase/auth';
-
-const firebaseConfig = {
-  apiKey: 'YOUR_API_KEY',
-  authDomain: 'YOUR_PROJECT_ID.firebaseapp.com',
-  projectId: 'YOUR_PROJECT_ID',
-  storageBucket: 'YOUR_PROJECT_ID.appspot.com',
-  messagingSenderId: 'YOUR_SENDER_ID',
-  appId: 'YOUR_APP_ID',
-};
-
-const app = initializeApp(firebaseConfig);
-const auth = getAuth(app);
-const provider = new GoogleAuthProvider();
+import { auth, loginWithGoogle, logout, onAuthStateChanged } from 'C:/Users/yagzc/Desktop/project/watermark-no-tailwind/firebase_auth.ts';
 
 export default function Home() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -27,24 +13,11 @@ export default function Home() {
   const opacity = 0.6; // <= watermark opaklığı (0.0 tamamen görünmez, 1.0 tam opak)
 
   useEffect(() => {
-    onAuthStateChanged(auth, (currentUser) => {
-      setUser(currentUser);
+    const unsubscribe = onAuthStateChanged(auth, (user) => {
+      setUser(user);
     });
+    return () => unsubscribe();
   }, []);
-
-  const handleLogin = async () => {
-    try {
-      const result = await signInWithPopup(auth, provider);
-      setUser(result.user);
-    } catch (err) {
-      console.error(err);
-    }
-  };
-
-  const handleLogout = () => {
-    signOut(auth);
-    setUser(null);
-  };
 
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -114,37 +87,42 @@ export default function Home() {
       <h1>Unremovable Watermark Generator</h1>
 
       {!user ? (
-        <button onClick={handleLogin}>Google ile Giriş Yap</button>
+        <button onClick={loginWithGoogle}>Google ile Giriş Yap</button>
       ) : (
         <div>
-          <p>Hoşgeldin, {user.displayName}</p>
-          <button onClick={handleLogout}>Çıkış Yap</button>
+          <p>Merhaba, {user.displayName}</p>
+          <button onClick={logout}>Çıkış Yap</button>
         </div>
       )}
 
       <br /><br />
-      <label>1. Upload your image:</label><br />
-      <input type="file" accept="image/*" onChange={handleImageUpload} />
-      <br /><br />
 
-      <label>2. Enter watermark text:</label><br />
-      <input
-        type="text"
-        value={text}
-        onChange={(e) => setText(e.target.value)}
-        style={{ padding: '0.5rem', fontSize: '1rem', width: '200px' }}
-      />
-      <br /><br />
-
-      {imageURL && (
+      {user && (
         <>
-          <img ref={imageRef} src={imageURL} alt="uploaded" onLoad={drawWatermark} style={{ display: 'none' }} />
-          <canvas ref={canvasRef} style={{ border: '1px solid #333', marginTop: '1rem', maxWidth: '100%' }} />
-          <br />
-          {downloadURL && (
-            <a href={downloadURL} download="watermarked.png" style={{ color: '#ccc' }}>
-              Download Watermarked Image
-            </a>
+          <label>1. Upload your image:</label><br />
+          <input type="file" accept="image/*" onChange={handleImageUpload} />
+          <br /><br />
+
+          <label>2. Enter watermark text:</label><br />
+          <input
+            type="text"
+            value={text}
+            onChange={(e) => setText(e.target.value)}
+            style={{ padding: '0.5rem', fontSize: '1rem', width: '200px' }}
+          />
+          <br /><br />
+
+          {imageURL && (
+            <>
+              <img ref={imageRef} src={imageURL} alt="uploaded" onLoad={drawWatermark} style={{ display: 'none' }} />
+              <canvas ref={canvasRef} style={{ border: '1px solid #333', marginTop: '1rem', maxWidth: '100%' }} />
+              <br />
+              {downloadURL && (
+                <a href={downloadURL} download="watermarked.png" style={{ color: '#ccc' }}>
+                  Download Watermarked Image
+                </a>
+              )}
+            </>
           )}
         </>
       )}
