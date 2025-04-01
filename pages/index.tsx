@@ -1,4 +1,19 @@
-import { useRef, useState } from 'react';
+import { useRef, useState, useEffect } from 'react';
+import { initializeApp } from 'firebase/app';
+import { getAuth, GoogleAuthProvider, signInWithPopup, onAuthStateChanged, signOut } from 'firebase/auth';
+
+const firebaseConfig = {
+  apiKey: 'YOUR_API_KEY',
+  authDomain: 'YOUR_PROJECT_ID.firebaseapp.com',
+  projectId: 'YOUR_PROJECT_ID',
+  storageBucket: 'YOUR_PROJECT_ID.appspot.com',
+  messagingSenderId: 'YOUR_SENDER_ID',
+  appId: 'YOUR_APP_ID',
+};
+
+const app = initializeApp(firebaseConfig);
+const auth = getAuth(app);
+const provider = new GoogleAuthProvider();
 
 export default function Home() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -6,8 +21,30 @@ export default function Home() {
 
   const [imageURL, setImageURL] = useState<string | null>(null);
   const [text, setText] = useState<string>('ziyech');
-  const [opacity, setOpacity] = useState<number>(0.6); // Opaklık ayarı burada
   const [downloadURL, setDownloadURL] = useState<string | null>(null);
+  const [user, setUser] = useState<any>(null);
+
+  const opacity = 0.6; // <= watermark opaklığı (0.0 tamamen görünmez, 1.0 tam opak)
+
+  useEffect(() => {
+    onAuthStateChanged(auth, (currentUser) => {
+      setUser(currentUser);
+    });
+  }, []);
+
+  const handleLogin = async () => {
+    try {
+      const result = await signInWithPopup(auth, provider);
+      setUser(result.user);
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  const handleLogout = () => {
+    signOut(auth);
+    setUser(null);
+  };
 
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -48,18 +85,19 @@ export default function Home() {
         gradientImage.src = '/Rectangle 108.png';
 
         gradientImage.onload = () => {
-          textCtx.save();
-          textCtx.translate(textX, textY);
-          textCtx.rotate((-45 * Math.PI) / 180);
-          textCtx.translate(-textX, -textY);
-
-          textCtx.drawImage(gradientImage, 0, 0, canvas.width, canvas.height);
-          textCtx.globalCompositeOperation = 'destination-in';
-          textCtx.globalAlpha = opacity; // Opaklık burada uygulanıyor
           textCtx.font = `bold ${fontSize}px Arial`;
           textCtx.textAlign = 'center';
           textCtx.textBaseline = 'middle';
-          textCtx.fillText(text, textX, textY);
+
+          textCtx.save();
+          textCtx.translate(textX, textY);
+          textCtx.rotate((45 * Math.PI) / 180);
+
+          textCtx.drawImage(gradientImage, -canvas.width / 2, -canvas.height / 2, canvas.width, canvas.height);
+
+          textCtx.globalCompositeOperation = 'destination-in';
+          textCtx.fillStyle = `rgba(255, 255, 255, ${opacity})`;
+          textCtx.fillText(text, 0, 0);
 
           textCtx.restore();
 
@@ -75,6 +113,16 @@ export default function Home() {
     <div style={{ padding: '2rem', fontFamily: 'sans-serif', background: '#111', color: '#eee' }}>
       <h1>Unremovable Watermark Generator</h1>
 
+      {!user ? (
+        <button onClick={handleLogin}>Google ile Giriş Yap</button>
+      ) : (
+        <div>
+          <p>Hoşgeldin, {user.displayName}</p>
+          <button onClick={handleLogout}>Çıkış Yap</button>
+        </div>
+      )}
+
+      <br /><br />
       <label>1. Upload your image:</label><br />
       <input type="file" accept="image/*" onChange={handleImageUpload} />
       <br /><br />
@@ -86,19 +134,6 @@ export default function Home() {
         onChange={(e) => setText(e.target.value)}
         style={{ padding: '0.5rem', fontSize: '1rem', width: '200px' }}
       />
-      <br /><br />
-
-      <label>3. Set watermark opacity:</label><br />
-      <input
-        type="range"
-        min={0}
-        max={1}
-        step={0.01}
-        value={opacity}
-        onChange={(e) => setOpacity(parseFloat(e.target.value))}
-        style={{ width: '200px' }}
-      />
-      <span> {opacity}</span>
       <br /><br />
 
       {imageURL && (
