@@ -1,7 +1,8 @@
 import { useRef, useState, useEffect } from 'react';
 import { auth, loginWithGoogle, logout, onAuthStateChanged, db } from '../firebase_auth';
-import { doc, getDoc, updateDoc } from 'firebase/firestore';
+import { doc, getDoc, updateDoc, setDoc } from 'firebase/firestore';
 import Link from 'next/link';
+import Head from 'next/head';
 
 export default function Home() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -13,6 +14,7 @@ export default function Home() {
   const [user, setUser] = useState<any>(null);
   const [credits, setCredits] = useState<number | null>(null);
   const [usedGuest, setUsedGuest] = useState<boolean>(false);
+  const [isPremium, setIsPremium] = useState<boolean>(false);
 
   const opacity = 0.6;
 
@@ -26,7 +28,13 @@ export default function Home() {
         const userRef = doc(db, 'users', u.uid);
         const userSnap = await getDoc(userRef);
         if (userSnap.exists()) {
-          setCredits(userSnap.data().credits);
+          const data = userSnap.data();
+          setCredits(data.credits);
+          setIsPremium(data.premium === true);
+        } else {
+          await setDoc(userRef, { credits: 3, premium: false });
+          setCredits(3);
+          setIsPremium(false);
         }
       }
     });
@@ -52,7 +60,7 @@ export default function Home() {
       return;
     }
 
-    if (user && credits !== null && credits <= 0) {
+    if (user && credits !== null && credits <= 0 && !isPremium) {
       alert("Kullanım hakkınız tükendi. Lütfen abone olun.");
       return;
     }
@@ -101,7 +109,7 @@ export default function Home() {
           if (!user) {
             localStorage.setItem('guestUsed', 'true');
             setUsedGuest(true);
-          } else if (credits !== null) {
+          } else if (credits !== null && !isPremium) {
             const userRef = doc(db, 'users', user.uid);
             await updateDoc(userRef, { credits: credits - 1 });
             setCredits(credits - 1);
@@ -111,8 +119,33 @@ export default function Home() {
     }
   };
 
+  const handlePremiumPurchase = () => {
+    if (isPremium) return alert("Zaten premium üyeliğiniz aktif.");
+
+    // eslint-disable-next-line no-undef
+    // @ts-ignore
+
+    Paddle.Checkout.open({
+      seller: 222844,
+      product: "pro_01jqsz3yf225k4k2svckag9fkv",
+      successCallback: async () => {
+        alert("Satın alma başarılı! Premium hesabınız tanımlanacak.");
+        if (user) {
+          const userRef = doc(db, 'users', user.uid);
+          await updateDoc(userRef, { premium: true, credits: 999 });
+          setIsPremium(true);
+          setCredits(999);
+        }
+      }
+    });
+  };
+
   return (
     <div style={{ padding: '2rem', fontFamily: 'sans-serif', background: '#111', color: '#eee' }}>
+      <Head>
+        <script src="https://cdn.paddle.com/paddle/paddle.js"></script>
+      </Head>
+
       <h1>Unremovable Watermark Generator</h1>
 
       <div style={{ marginBottom: '1rem' }}>
@@ -125,8 +158,18 @@ export default function Home() {
         <button onClick={loginWithGoogle}>Google ile Giriş Yap</button>
       ) : (
         <>
-          <p>Hoşgeldin, {user.displayName} | Kalan hak: {credits}</p>
-          <button onClick={logout}>Çıkış Yap</button>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+            <p>👤 {user.displayName} | Hak: {isPremium ? '∞' : credits}</p>
+            <button onClick={logout}>Çıkış Yap</button>
+          </div>
+
+          {!isPremium && (
+            <button
+              onClick={handlePremiumPurchase}
+              style={{ marginTop: '1rem', padding: '0.5rem 1rem', backgroundColor: '#0af', color: '#fff' }}>
+              🚀 Premium Satın Al
+            </button>
+          )}
         </>
       )}
 
